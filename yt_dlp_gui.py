@@ -337,6 +337,7 @@ class YtDlpGUI:
         if hasattr(self, "lbl_status") and not self.is_downloading:
             self.lbl_status.config(foreground=p["TEXT_MAIN"])
 
+        self.update_mode_buttons()
         self.render_history_table()
 
     def build_ui(self):
@@ -538,11 +539,11 @@ class YtDlpGUI:
 
         mode_hdr = ttk.Label(
             fmt_card,
-            text="Select Download Mode:",
+            text="📌 Choose Mode & Format Options:",
             style="Card.TLabel",
             font=("Segoe UI", 9, "bold"),
         )
-        mode_hdr.pack(anchor="w", pady=(0, 4))
+        mode_hdr.pack(anchor="w", pady=(0, 6))
 
         self.mode_var = tk.StringVar(value="video")
 
@@ -550,25 +551,29 @@ class YtDlpGUI:
         mode_btn_frame.pack(fill=tk.X, pady=(0, 8))
         self.themeable_frames.append((mode_btn_frame, True))
 
-        rb_video = ttk.Radiobutton(
+        self.btn_mode_video = tk.Button(
             mode_btn_frame,
-            text="🎥 Video (+ Audio)",
-            value="video",
-            variable=self.mode_var,
-            style="Custom.TRadiobutton",
-            command=self.on_mode_change,
+            text="✅ 🎥 Video (+ Audio)",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            cursor="hand2",
+            padx=12,
+            pady=5,
+            command=lambda: self.set_mode("video"),
         )
-        rb_video.pack(side=tk.LEFT, padx=(0, 20))
+        self.btn_mode_video.pack(side=tk.LEFT, padx=(0, 10))
 
-        rb_audio = ttk.Radiobutton(
+        self.btn_mode_audio = tk.Button(
             mode_btn_frame,
-            text="🎵 Extract Audio Only",
-            value="audio",
-            variable=self.mode_var,
-            style="Custom.TRadiobutton",
-            command=self.on_mode_change,
+            text="⬜ 🎵 Extract Audio Only",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            cursor="hand2",
+            padx=12,
+            pady=5,
+            command=lambda: self.set_mode("audio"),
         )
-        rb_audio.pack(side=tk.LEFT)
+        self.btn_mode_audio.pack(side=tk.LEFT)
 
         sep = tk.Frame(fmt_card, bg=p["CARD_BORDER"], height=1)
         sep.pack(fill=tk.X, pady=(0, 8))
@@ -672,30 +677,60 @@ class YtDlpGUI:
         self.combo_audio_quality.current(0)
         self.combo_audio_quality.pack(side=tk.LEFT)
 
-        # Checkboxes
+        # Checkboxes (Ceklis Fitur Extra)
+        sep_opts = tk.Frame(fmt_card, bg=p["CARD_BORDER"], height=1)
+        sep_opts.pack(fill=tk.X, pady=(6, 6))
+        self.themeable_frames.append((sep_opts, True))
+
+        row_extras_lbl = ttk.Label(
+            fmt_card,
+            text="☑️ Additional Features (Pilihan Ceklis):",
+            style="Card.TLabel",
+            font=("Segoe UI", 9, "bold"),
+        )
+        row_extras_lbl.pack(anchor="w", pady=(0, 4))
+
         row_extras = tk.Frame(fmt_card, bg=p["CARD_BG"])
-        row_extras.pack(fill=tk.X, pady=(6, 0))
+        row_extras.pack(fill=tk.X, pady=(2, 0))
         self.themeable_frames.append((row_extras, True))
 
         self.chk_sub_var = tk.BooleanVar(value=False)
         chk_sub = ttk.Checkbutton(
             row_extras,
-            text="📝 Download Subtitles (ID/EN)",
+            text="📝 Subtitles (ID / EN)",
             variable=self.chk_sub_var,
             style="Custom.TCheckbutton",
         )
-        chk_sub.pack(side=tk.LEFT, padx=(0, 18))
+        chk_sub.pack(side=tk.LEFT, padx=(0, 16))
 
         self.chk_thumb_var = tk.BooleanVar(value=True)
         chk_thumb = ttk.Checkbutton(
             row_extras,
-            text="🖼️ Embed Cover Thumbnail",
+            text="🖼️ Cover Thumbnail",
             variable=self.chk_thumb_var,
             style="Custom.TCheckbutton",
         )
-        chk_thumb.pack(side=tk.LEFT)
+        chk_thumb.pack(side=tk.LEFT, padx=(0, 16))
 
-        self.on_mode_change()
+        self.chk_meta_var = tk.BooleanVar(value=True)
+        chk_meta = ttk.Checkbutton(
+            row_extras,
+            text="🏷️ Metadata Tags",
+            variable=self.chk_meta_var,
+            style="Custom.TCheckbutton",
+        )
+        chk_meta.pack(side=tk.LEFT, padx=(0, 16))
+
+        self.chk_desc_var = tk.BooleanVar(value=False)
+        chk_desc = ttk.Checkbutton(
+            row_extras,
+            text="📑 Save Description",
+            variable=self.chk_desc_var,
+            style="Custom.TCheckbutton",
+        )
+        chk_desc.pack(side=tk.LEFT)
+
+        self.set_mode("video")
 
         # --- 4. DESTINATION FOLDER CARD ---
         dest_card = tk.Frame(
@@ -1113,6 +1148,46 @@ class YtDlpGUI:
 
     # ---------------- HANDLERS & HELPERS ----------------
 
+    def set_mode(self, mode):
+        self.mode_var.set(mode)
+        self.update_mode_buttons()
+        self.on_mode_change()
+
+    def update_mode_buttons(self):
+        if not hasattr(self, "btn_mode_video") or not hasattr(self, "btn_mode_audio"):
+            return
+        p = self.palette
+        if self.mode_var.get() == "video":
+            self.btn_mode_video.config(
+                text="✅ 🎥 Video (+ Audio)",
+                bg=p["ACCENT"],
+                fg=p["ACCENT_FG"],
+                activebackground=p["ACCENT_HOVER"],
+                activeforeground=p["ACCENT_FG"],
+            )
+            self.btn_mode_audio.config(
+                text="⬜ 🎵 Extract Audio Only",
+                bg=p["INPUT_BG"],
+                fg=p["TEXT_MUTED"],
+                activebackground=p["CARD_BORDER"],
+                activeforeground=p["TEXT_MAIN"],
+            )
+        else:
+            self.btn_mode_video.config(
+                text="⬜ 🎥 Video (+ Audio)",
+                bg=p["INPUT_BG"],
+                fg=p["TEXT_MUTED"],
+                activebackground=p["CARD_BORDER"],
+                activeforeground=p["TEXT_MAIN"],
+            )
+            self.btn_mode_audio.config(
+                text="✅ 🎵 Extract Audio Only",
+                bg=p["ACCENT"],
+                fg=p["ACCENT_FG"],
+                activebackground=p["ACCENT_HOVER"],
+                activeforeground=p["ACCENT_FG"],
+            )
+
     def on_mode_change(self):
         mode = self.mode_var.get()
         if mode == "video":
@@ -1295,6 +1370,13 @@ class YtDlpGUI:
             opts["writeautomaticsub"] = True
             opts["subtitleslangs"] = ["id", "en"]
             postprocessors.append({"key": "FFmpegEmbedSubtitle"})
+
+        if hasattr(self, "chk_meta_var") and self.chk_meta_var.get():
+            opts["addmetadata"] = True
+            postprocessors.append({"key": "FFmpegMetadata"})
+
+        if hasattr(self, "chk_desc_var") and self.chk_desc_var.get():
+            opts["writedescription"] = True
 
         if postprocessors:
             opts["postprocessors"] = postprocessors
