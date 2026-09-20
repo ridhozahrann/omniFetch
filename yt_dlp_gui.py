@@ -1702,11 +1702,6 @@ class YtDlpGUI:
                     )
                 opts["force_keyframes_at_cuts"] = True
 
-                ff_args = ["-ss", str(s)]
-                if e != float("inf"):
-                    ff_args.extend(["-to", str(e)])
-                opts["postprocessor_args"] = {"ffmpeg": ff_args}
-
         if postprocessors:
             opts["postprocessors"] = postprocessors
 
