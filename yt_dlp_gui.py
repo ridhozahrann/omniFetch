@@ -133,18 +133,10 @@ class YtDlpGUI:
         self.root = root
 
         self.root.title("OmniFetch Pro - Universal Media Downloader")
-        self.center_window(860, 840)
         self.root.minsize(760, 720)
+        self.center_window(860, 840)
 
-    def center_window(self, width=860, height=840):
-        """Center the main application window on screen."""
-        self.root.update_idletasks()
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        x = max(0, (screen_w - width) // 2)
-        y = max(0, (screen_h - height) // 2)
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
-
+        # Set window icon
         ico_path = os.path.join(SCRIPT_DIR, "app.ico")
         png_path = os.path.join(SCRIPT_DIR, "app.png")
         if os.path.exists(ico_path):
@@ -201,6 +193,15 @@ class YtDlpGUI:
         # Auto-detect URL from clipboard on focus
         self._last_autopaste = ""
         self.root.bind("<FocusIn>", self.on_focus_in)
+
+    def center_window(self, width=860, height=840):
+        """Center the main application window on screen."""
+        self.root.update_idletasks()
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
     def on_focus_in(self, event=None):
         if self.is_downloading or not hasattr(self, "url_text"):
@@ -1684,7 +1685,6 @@ class YtDlpGUI:
             postprocessors.append({"key": "FFmpegEmbedSubtitle"})
 
         if hasattr(self, "chk_meta_var") and self.chk_meta_var.get():
-            opts["addmetadata"] = True
             postprocessors.append({"key": "FFmpegMetadata"})
 
         if hasattr(self, "chk_desc_var") and self.chk_desc_var.get():
