@@ -438,19 +438,8 @@ class YtDlpGUI:
         header_card.pack(fill=tk.X, pady=(0, 10))
         self.themeable_frames.append((header_card, True))
 
-        title_frame = tk.Frame(header_card, bg=p["CARD_BG"])
-        title_frame.pack(fill=tk.X)
-        self.themeable_frames.append((title_frame, True))
-
-        title_label = ttk.Label(
-            title_frame,
-            text="OmniFetch Pro - Media Downloader",
-            style="Title.TLabel",
-        )
-        title_label.pack(side=tk.LEFT)
-
-        btn_box = tk.Frame(title_frame, bg=p["CARD_BG"])
-        btn_box.pack(side=tk.RIGHT)
+        btn_box = tk.Frame(header_card, bg=p["CARD_BG"])
+        btn_box.pack(fill=tk.X)
         self.themeable_frames.append((btn_box, True))
 
         self.btn_theme_toggle = tk.Button(
@@ -504,12 +493,22 @@ class YtDlpGUI:
         )
         lbl_ffmpeg.pack(side=tk.RIGHT)
 
+        title_label = ttk.Label(
+            header_card,
+            text="OmniFetch",
+            style="Title.TLabel",
+            font=("Segoe UI", 18, "bold"),
+            anchor="center",
+        )
+        title_label.pack(fill=tk.X, pady=(2, 2))
+
         subtitle_label = ttk.Label(
             header_card,
-            text="Download single videos, playlists, or batch URLs. Convert to MP4/MKV or extract MP3/M4A/FLAC audio.",
+            text="Universal Media Downloader",
             style="Subtitle.TLabel",
+            anchor="center",
         )
-        subtitle_label.pack(anchor="w", pady=(2, 0))
+        subtitle_label.pack(fill=tk.X, pady=(0, 2))
 
         # --- 2. URL INPUT CARD ---
         url_card = tk.Frame(
