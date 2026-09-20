@@ -41,6 +41,46 @@ def find_ffmpeg():
     return None
 
 
+def open_path(path):
+    """Open file or folder in OS cross-platform default viewer."""
+    if sys.platform == "win32":
+        os.startfile(path)
+    elif sys.platform == "darwin":
+        subprocess.run(["open", path])
+    else:
+        subprocess.run(["xdg-open", path])
+
+
+def parse_time_str(val_str):
+    """Parse time string like 01:30 or 90 to float seconds."""
+    if not val_str or not val_str.strip():
+        return None
+    parts = val_str.strip().split(":")
+    try:
+        if len(parts) == 1:
+            return float(parts[0])
+        elif len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+        elif len(parts) == 3:
+            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+    except ValueError:
+        return None
+    return None
+
+
+def format_size(bytes_val):
+    """Format bytes into readable string (MB/GB)."""
+    if not bytes_val or bytes_val <= 0:
+        return "-"
+    if bytes_val >= 1024 * 1024 * 1024:
+        return f"{bytes_val / (1024**3):.2f} GB"
+    elif bytes_val >= 1024 * 1024:
+        return f"{bytes_val / (1024**2):.1f} MB"
+    elif bytes_val >= 1024:
+        return f"{bytes_val / 1024:.0f} KB"
+    return f"{bytes_val} B"
+
+
 THEMES = {
     "dark": {
         "BG_DARK": "#181825",
@@ -57,7 +97,7 @@ THEMES = {
         "INPUT_BG": "#11111b",
         "TOGGLE_BTN_BG": "#313244",
         "TOGGLE_BTN_FG": "#cdd6f4",
-        "TOGGLE_TEXT": "☀️ Light Mode",
+        "TOGGLE_TEXT": "Light Mode",
     },
     "light": {
         "BG_DARK": "#f1f5f9",
@@ -74,7 +114,7 @@ THEMES = {
         "INPUT_BG": "#f8fafc",
         "TOGGLE_BTN_BG": "#e2e8f0",
         "TOGGLE_BTN_FG": "#0f172a",
-        "TOGGLE_TEXT": "🌙 Dark Mode",
+        "TOGGLE_TEXT": "Dark Mode",
     },
 }
 
@@ -86,6 +126,13 @@ class YtDlpGUI:
         self.root.title("OmniFetch Pro - Universal Media Downloader")
         self.root.geometry("860x840")
         self.root.minsize(760, 720)
+
+        ico_path = os.path.join(SCRIPT_DIR, "app.ico")
+        if os.path.exists(ico_path):
+            try:
+                self.root.iconbitmap(ico_path)
+            except Exception:
+                pass
 
         # Load user config for theme preference
         self.user_config = self.load_user_config()
@@ -125,6 +172,24 @@ class YtDlpGUI:
 
         # Start checking queue
         self.root.after(100, self.process_queue)
+
+        # Auto-detect URL from clipboard on focus
+        self._last_autopaste = ""
+        self.root.bind("<FocusIn>", self.on_focus_in)
+
+    def on_focus_in(self, event=None):
+        if self.is_downloading or not hasattr(self, "url_text"):
+            return
+        content = self.url_text.get("1.0", tk.END).strip()
+        if not content:
+            try:
+                clip = self.root.clipboard_get().strip()
+                if (clip.startswith("http://") or clip.startswith("https://")) and clip != self._last_autopaste:
+                    self._last_autopaste = clip
+                    self.url_text.insert("1.0", clip)
+                    self.log(f"[+] Auto-detected URL from clipboard: {clip[:60]}...")
+            except tk.TclError:
+                pass
 
     def load_user_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -346,11 +411,11 @@ class YtDlpGUI:
 
         # TAB 1: Main Downloader
         self.tab_downloader = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(self.tab_downloader, text="📥 Main Downloader")
+        self.notebook.add(self.tab_downloader, text="Main Downloader")
 
         # TAB 2: Download History
         self.tab_history = ttk.Frame(self.notebook, padding=12)
-        self.notebook.add(self.tab_history, text="📜 Download History")
+        self.notebook.add(self.tab_history, text="Download History")
 
         self.build_tab_downloader()
         self.build_tab_history()
@@ -379,7 +444,7 @@ class YtDlpGUI:
 
         title_label = ttk.Label(
             title_frame,
-            text="🎬 OmniFetch Pro - Media Downloader",
+            text="OmniFetch Pro - Media Downloader",
             style="Title.TLabel",
         )
         title_label.pack(side=tk.LEFT)
@@ -403,11 +468,11 @@ class YtDlpGUI:
         self.btn_theme_toggle.pack(side=tk.RIGHT, padx=(6, 0))
 
         if self.ffmpeg_path:
-            badge_text = "🟢 FFmpeg Detected"
+            badge_text = "FFmpeg Detected"
             badge_bg = "#275d38"
             badge_fg = "#a6e3a1"
         else:
-            badge_text = "🟡 FFmpeg Not Found"
+            badge_text = "FFmpeg Not Found"
             badge_bg = "#6e5218"
             badge_fg = "#f9e2af"
 
@@ -455,7 +520,7 @@ class YtDlpGUI:
 
         btn_paste = tk.Button(
             url_hdr_frame,
-            text="📋 Paste Clipboard",
+            text="Paste Clipboard",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
@@ -472,7 +537,7 @@ class YtDlpGUI:
 
         btn_fetch_info = tk.Button(
             url_hdr_frame,
-            text="🔍 Check Info",
+            text="Check Info",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
@@ -539,7 +604,7 @@ class YtDlpGUI:
 
         mode_hdr = ttk.Label(
             fmt_card,
-            text="📌 Choose Mode & Format Options:",
+            text="Choose Mode & Format Options:",
             style="Card.TLabel",
             font=("Segoe UI", 9, "bold"),
         )
@@ -553,7 +618,7 @@ class YtDlpGUI:
 
         self.btn_mode_video = tk.Button(
             mode_btn_frame,
-            text="✅ 🎥 Video (+ Audio)",
+            text="Video (+ Audio)",
             font=("Segoe UI", 9, "bold"),
             relief="flat",
             cursor="hand2",
@@ -565,7 +630,7 @@ class YtDlpGUI:
 
         self.btn_mode_audio = tk.Button(
             mode_btn_frame,
-            text="⬜ 🎵 Extract Audio Only",
+            text="Extract Audio Only",
             font=("Segoe UI", 9, "bold"),
             relief="flat",
             cursor="hand2",
@@ -684,7 +749,7 @@ class YtDlpGUI:
 
         row_extras_lbl = ttk.Label(
             fmt_card,
-            text="☑️ Additional Features (Pilihan Ceklis):",
+            text="Additional Options:",
             style="Card.TLabel",
             font=("Segoe UI", 9, "bold"),
         )
@@ -697,7 +762,7 @@ class YtDlpGUI:
         self.chk_sub_var = tk.BooleanVar(value=False)
         chk_sub = ttk.Checkbutton(
             row_extras,
-            text="📝 Subtitles (ID / EN)",
+            text="Subtitles (ID / EN)",
             variable=self.chk_sub_var,
             style="Custom.TCheckbutton",
         )
@@ -706,7 +771,7 @@ class YtDlpGUI:
         self.chk_thumb_var = tk.BooleanVar(value=True)
         chk_thumb = ttk.Checkbutton(
             row_extras,
-            text="🖼️ Cover Thumbnail",
+            text="Cover Thumbnail",
             variable=self.chk_thumb_var,
             style="Custom.TCheckbutton",
         )
@@ -715,7 +780,7 @@ class YtDlpGUI:
         self.chk_meta_var = tk.BooleanVar(value=True)
         chk_meta = ttk.Checkbutton(
             row_extras,
-            text="🏷️ Metadata Tags",
+            text="Metadata Tags",
             variable=self.chk_meta_var,
             style="Custom.TCheckbutton",
         )
@@ -724,11 +789,55 @@ class YtDlpGUI:
         self.chk_desc_var = tk.BooleanVar(value=False)
         chk_desc = ttk.Checkbutton(
             row_extras,
-            text="📑 Save Description",
+            text="Save Description",
             variable=self.chk_desc_var,
             style="Custom.TCheckbutton",
         )
         chk_desc.pack(side=tk.LEFT)
+
+        # Clip Duration Row
+        row_clip = tk.Frame(fmt_card, bg=p["CARD_BG"])
+        row_clip.pack(fill=tk.X, pady=(6, 0))
+        self.themeable_frames.append((row_clip, True))
+
+        self.chk_clip_var = tk.BooleanVar(value=False)
+        chk_clip = ttk.Checkbutton(
+            row_clip,
+            text="Clip Duration:",
+            variable=self.chk_clip_var,
+            style="Custom.TCheckbutton",
+        )
+        chk_clip.pack(side=tk.LEFT, padx=(0, 8))
+
+        ttk.Label(row_clip, text="Start:", style="Card.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        self.entry_clip_start = tk.Entry(
+            row_clip,
+            width=9,
+            bg=p["INPUT_BG"],
+            fg=p["TEXT_MAIN"],
+            insertbackground=p["TEXT_MAIN"],
+            relief="flat",
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+        )
+        self.entry_clip_start.insert(0, "00:00:00")
+        self.entry_clip_start.pack(side=tk.LEFT, padx=(0, 12))
+        self.themeable_inputs.append(self.entry_clip_start)
+
+        ttk.Label(row_clip, text="End:", style="Card.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        self.entry_clip_end = tk.Entry(
+            row_clip,
+            width=9,
+            bg=p["INPUT_BG"],
+            fg=p["TEXT_MAIN"],
+            insertbackground=p["TEXT_MAIN"],
+            relief="flat",
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+        )
+        self.entry_clip_end.insert(0, "00:01:00")
+        self.entry_clip_end.pack(side=tk.LEFT)
+        self.themeable_inputs.append(self.entry_clip_end)
 
         self.set_mode("video")
 
@@ -772,7 +881,7 @@ class YtDlpGUI:
 
         btn_browse = tk.Button(
             path_input_frame,
-            text="📁 Browse",
+            text="Browse",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
@@ -788,7 +897,7 @@ class YtDlpGUI:
 
         btn_open_folder = tk.Button(
             path_input_frame,
-            text="📂 Open",
+            text="Open",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
@@ -820,7 +929,7 @@ class YtDlpGUI:
 
         self.btn_download = tk.Button(
             btn_action_frame,
-            text="⚡ START DOWNLOAD NOW",
+            text="START DOWNLOAD",
             bg=p["ACCENT"],
             fg=p["ACCENT_FG"],
             activebackground=p["ACCENT_HOVER"],
@@ -836,7 +945,7 @@ class YtDlpGUI:
 
         self.btn_cancel = tk.Button(
             btn_action_frame,
-            text="❌ Cancel",
+            text="Cancel",
             bg=p["CARD_BORDER"],
             fg=p["ERROR"],
             activebackground=p["ERROR"],
@@ -934,7 +1043,7 @@ class YtDlpGUI:
         self.themeable_frames.append((hdr, True))
 
         ttk.Label(
-            hdr, text="📜 Registered Download History", style="Title.TLabel"
+            hdr, text="Registered Download History", style="Title.TLabel"
         ).pack(anchor="w")
         ttk.Label(
             hdr,
@@ -948,7 +1057,7 @@ class YtDlpGUI:
 
         btn_play = tk.Button(
             toolbar,
-            text="▶️ Play File",
+            text="Play File",
             bg=p["ACCENT"],
             fg=p["ACCENT_FG"],
             activebackground=p["ACCENT_HOVER"],
@@ -965,7 +1074,7 @@ class YtDlpGUI:
 
         btn_folder = tk.Button(
             toolbar,
-            text="📂 Open Folder",
+            text="Open Folder",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
@@ -982,7 +1091,7 @@ class YtDlpGUI:
 
         btn_del = tk.Button(
             toolbar,
-            text="🗑️ Delete Entry",
+            text="Delete Entry",
             bg=p["CARD_BORDER"],
             fg=p["ERROR"],
             activebackground=p["ERROR"],
@@ -998,7 +1107,7 @@ class YtDlpGUI:
 
         btn_clear_all = tk.Button(
             toolbar,
-            text="🧹 Clear All",
+            text="Clear All",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MUTED"],
             activebackground=p["ERROR"],
@@ -1021,7 +1130,7 @@ class YtDlpGUI:
         tree_frame.pack(fill=tk.BOTH, expand=True)
         self.themeable_frames.append((tree_frame, True))
 
-        columns = ("datetime", "title", "format", "filepath")
+        columns = ("datetime", "title", "format", "size", "filepath")
         self.tree_history = ttk.Treeview(
             tree_frame, columns=columns, show="headings", selectmode="browse"
         )
@@ -1029,12 +1138,14 @@ class YtDlpGUI:
         self.tree_history.heading("datetime", text="Date/Time")
         self.tree_history.heading("title", text="Media Title")
         self.tree_history.heading("format", text="Format")
+        self.tree_history.heading("size", text="Size")
         self.tree_history.heading("filepath", text="File Location")
 
-        self.tree_history.column("datetime", width=140, anchor="w")
-        self.tree_history.column("title", width=290, anchor="w")
-        self.tree_history.column("format", width=90, anchor="center")
-        self.tree_history.column("filepath", width=250, anchor="w")
+        self.tree_history.column("datetime", width=130, anchor="w")
+        self.tree_history.column("title", width=250, anchor="w")
+        self.tree_history.column("format", width=80, anchor="center")
+        self.tree_history.column("size", width=80, anchor="center")
+        self.tree_history.column("filepath", width=230, anchor="w")
 
         scrollbar = ttk.Scrollbar(
             tree_frame, orient="vertical", command=self.tree_history.yview
@@ -1064,12 +1175,19 @@ class YtDlpGUI:
         except Exception as e:
             self.log(f"[WARN History] Failed to save history: {e}")
 
-    def add_to_history(self, title, fmt_name, filepath):
+    def add_to_history(self, title, fmt_name, filepath, filesize=None):
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        if filesize is None and os.path.exists(filepath):
+            try:
+                filesize = os.path.getsize(filepath)
+            except Exception:
+                filesize = 0
+        size_str = format_size(filesize) if isinstance(filesize, (int, float)) else str(filesize or "-")
         item = {
             "datetime": now_str,
             "title": title,
             "format": fmt_name,
+            "size": size_str,
             "filepath": filepath,
         }
         self.history_data.insert(0, item)
@@ -1083,6 +1201,9 @@ class YtDlpGUI:
             self.tree_history.delete(row)
 
         for item in self.history_data:
+            size_val = item.get("size")
+            if not size_val and item.get("filepath") and os.path.exists(item.get("filepath")):
+                size_val = format_size(os.path.getsize(item["filepath"]))
             self.tree_history.insert(
                 "",
                 tk.END,
@@ -1090,6 +1211,7 @@ class YtDlpGUI:
                     item.get("datetime", ""),
                     item.get("title", "Unknown"),
                     item.get("format", "-"),
+                    size_val or "-",
                     item.get("filepath", ""),
                 ),
             )
@@ -1100,10 +1222,10 @@ class YtDlpGUI:
             messagebox.showwarning("Warning", "Please select a history entry first!")
             return
         values = self.tree_history.item(selected[0], "values")
-        filepath = values[3]
+        filepath = values[4]
 
         if os.path.exists(filepath):
-            os.startfile(filepath)
+            open_path(filepath)
         else:
             messagebox.showerror(
                 "File Not Found",
@@ -1116,13 +1238,13 @@ class YtDlpGUI:
             messagebox.showwarning("Warning", "Please select a history entry first!")
             return
         values = self.tree_history.item(selected[0], "values")
-        filepath = values[3]
+        filepath = values[4]
         folder = os.path.dirname(filepath)
 
         if os.path.exists(filepath):
             subprocess.run(["explorer", "/select,", os.path.normpath(filepath)])
         elif os.path.exists(folder):
-            os.startfile(folder)
+            open_path(folder)
         else:
             messagebox.showerror("Error", "Directory not found!")
 
@@ -1159,14 +1281,14 @@ class YtDlpGUI:
         p = self.palette
         if self.mode_var.get() == "video":
             self.btn_mode_video.config(
-                text="✅ 🎥 Video (+ Audio)",
+                text="Video (+ Audio)",
                 bg=p["ACCENT"],
                 fg=p["ACCENT_FG"],
                 activebackground=p["ACCENT_HOVER"],
                 activeforeground=p["ACCENT_FG"],
             )
             self.btn_mode_audio.config(
-                text="⬜ 🎵 Extract Audio Only",
+                text="Extract Audio Only",
                 bg=p["INPUT_BG"],
                 fg=p["TEXT_MUTED"],
                 activebackground=p["CARD_BORDER"],
@@ -1174,14 +1296,14 @@ class YtDlpGUI:
             )
         else:
             self.btn_mode_video.config(
-                text="⬜ 🎥 Video (+ Audio)",
+                text="Video (+ Audio)",
                 bg=p["INPUT_BG"],
                 fg=p["TEXT_MUTED"],
                 activebackground=p["CARD_BORDER"],
                 activeforeground=p["TEXT_MAIN"],
             )
             self.btn_mode_audio.config(
-                text="✅ 🎵 Extract Audio Only",
+                text="Extract Audio Only",
                 bg=p["ACCENT"],
                 fg=p["ACCENT_FG"],
                 activebackground=p["ACCENT_HOVER"],
@@ -1215,7 +1337,7 @@ class YtDlpGUI:
     def open_output_folder(self):
         folder = self.path_entry.get().strip()
         if os.path.exists(folder):
-            os.startfile(folder)
+            open_path(folder)
         else:
             messagebox.showwarning("Warning", "Save directory not found!")
 
@@ -1378,6 +1500,16 @@ class YtDlpGUI:
         if hasattr(self, "chk_desc_var") and self.chk_desc_var.get():
             opts["writedescription"] = True
 
+        if hasattr(self, "chk_clip_var") and self.chk_clip_var.get():
+            start_sec = parse_time_str(self.entry_clip_start.get())
+            end_sec = parse_time_str(self.entry_clip_end.get())
+            if start_sec is not None or end_sec is not None:
+                s = start_sec if start_sec is not None else 0
+                e = end_sec if end_sec is not None else float("inf")
+                if hasattr(yt_dlp.utils, "download_range_func"):
+                    opts["download_ranges"] = yt_dlp.utils.download_range_func(None, [(s, e)])
+                opts["force_keyframes_at_cuts"] = True
+
         if postprocessors:
             opts["postprocessors"] = postprocessors
 
@@ -1488,7 +1620,6 @@ class YtDlpGUI:
                     "socket_timeout": 30,
                     "retries": 10,
                     "fragment_retries": 10,
-                    "ignoreerrors": True,
                 }
                 if self.ffmpeg_path:
                     ydl_opts["ffmpeg_location"] = self.ffmpeg_path
@@ -1550,35 +1681,55 @@ class YtDlpGUI:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     self.current_ydl = ydl
                     info = ydl.extract_info(url, download=True)
-                    title = info.get("title", "Media File") if info else "Media File"
+                    if not info:
+                        self.msg_queue.put(("error_item", f"No metadata retrieved for {url}"))
+                        continue
 
-                    ext = info.get("ext", "mp4") if info else "mp4"
-                    if fmt_opts.get("merge_output_format"):
-                        ext = fmt_opts["merge_output_format"]
-                    elif self.mode_var.get() == "audio":
-                        ext = self.combo_audio_fmt.get().split()[0].lower()
-
-                    file_id = info.get("id", "") if info else ""
-                    final_path = os.path.join(out_dir, f"{title} [{file_id}].{ext}")
-                    if not os.path.exists(final_path):
-                        final_path = os.path.join(out_dir, f"{title}.{ext}")
+                    raw_entries = info.get("entries") if "entries" in info else [info]
+                    entries = [e for e in raw_entries if e]
 
                     mode_label = (
                         "Video"
                         if self.mode_var.get() == "video"
                         else self.combo_audio_fmt.get().split()[0]
                     )
-                    self.msg_queue.put(
-                        (
-                            "item_completed",
-                            {
-                                "title": title,
-                                "format": mode_label,
-                                "filepath": final_path,
-                            },
-                        )
-                    )
-                    completed_count += 1
+
+                    for entry in entries:
+                        title = entry.get("title", "Media File")
+                        file_id = entry.get("id", "")
+                        ext = entry.get("ext", "mp4")
+                        if fmt_opts.get("merge_output_format"):
+                            ext = fmt_opts["merge_output_format"]
+                        elif self.mode_var.get() == "audio":
+                            ext = self.combo_audio_fmt.get().split()[0].lower()
+
+                        final_path = ""
+                        req_downloads = entry.get("requested_downloads") or []
+                        if req_downloads and req_downloads[0].get("filepath"):
+                            final_path = req_downloads[0]["filepath"]
+                        elif entry.get("_filename"):
+                            final_path = entry.get("_filename")
+                        else:
+                            p1 = os.path.join(out_dir, f"{title} [{file_id}].{ext}")
+                            p2 = os.path.join(out_dir, f"{title}.{ext}")
+                            final_path = p1 if os.path.exists(p1) else p2
+
+                        if os.path.exists(final_path):
+                            self.msg_queue.put(
+                                (
+                                    "item_completed",
+                                    {
+                                        "title": title,
+                                        "format": mode_label,
+                                        "filepath": final_path,
+                                    },
+                                )
+                            )
+                            completed_count += 1
+                        else:
+                            self.msg_queue.put(
+                                ("log", f"[!] Download finished but file not found: {final_path}")
+                            )
 
             except yt_dlp.utils.DownloadCancelled:
                 self.msg_queue.put(("cancelled", None))
