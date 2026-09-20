@@ -1914,7 +1914,22 @@ class YtDlpGUI:
         self.root.after(100, self.process_queue)
 
 
+def enable_high_dpi_awareness():
+    """Enable High-DPI awareness on Windows to prevent blurry text in Tkinter."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
+    enable_high_dpi_awareness()
     root = tk.Tk()
     app = YtDlpGUI(root)
     root.mainloop()
