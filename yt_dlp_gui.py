@@ -6,6 +6,7 @@ import shutil
 import datetime
 import threading
 import subprocess
+import urllib.parse
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
@@ -22,6 +23,14 @@ except ImportError:
 
 HISTORY_FILE = os.path.join(SCRIPT_DIR, "download_history.json")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "user_config.json")
+
+
+def is_valid_url(url_str):
+    """Check if string is a valid HTTP/HTTPS URL."""
+    if not url_str or not isinstance(url_str, str):
+        return False
+    parsed = urllib.parse.urlparse(url_str.strip())
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def find_ffmpeg():
@@ -124,8 +133,17 @@ class YtDlpGUI:
         self.root = root
 
         self.root.title("OmniFetch Pro - Universal Media Downloader")
-        self.root.geometry("860x840")
+        self.center_window(860, 840)
         self.root.minsize(760, 720)
+
+    def center_window(self, width=860, height=840):
+        """Center the main application window on screen."""
+        self.root.update_idletasks()
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
         ico_path = os.path.join(SCRIPT_DIR, "app.ico")
         if os.path.exists(ico_path):
@@ -1456,6 +1474,13 @@ class YtDlpGUI:
             return
 
         target_url = urls[0]
+        if not is_valid_url(target_url):
+            messagebox.showwarning(
+                "Invalid URL",
+                f"Invalid URL format:\n'{target_url[:60]}'\n\nURL must start with http:// or https://",
+            )
+            return
+
         self.lbl_status.config(
             text="🔍 Fetching video metadata...", foreground=self.palette["ACCENT"]
         )
@@ -1607,6 +1632,21 @@ class YtDlpGUI:
             )
             return
 
+        valid_urls = [u for u in urls if is_valid_url(u)]
+        invalid_urls = [u for u in urls if not is_valid_url(u)]
+
+        if not valid_urls:
+            messagebox.showwarning(
+                "Invalid URL",
+                "No valid HTTP/HTTPS URLs found!\nPlease make sure link starts with http:// or https://",
+            )
+            return
+
+        if invalid_urls:
+            self.log(
+                f"[WARN] Skipped {len(invalid_urls)} invalid link(s): {', '.join(invalid_urls[:3])}"
+            )
+
         if not os.path.exists(out_dir):
             try:
                 os.makedirs(out_dir, exist_ok=True)
@@ -1624,12 +1664,14 @@ class YtDlpGUI:
 
         fmt_opts = self.build_format_opts()
         mode_name = "Video" if self.mode_var.get() == "video" else "Audio"
-        self.log(f"[+] Starting Batch Download ({len(urls)} links) [{mode_name}]...")
+        self.log(
+            f"[+] Starting Batch Download ({len(valid_urls)} valid link(s)) [{mode_name}]..."
+        )
         self.log(f"[+] Target folder: {out_dir}")
 
         thread = threading.Thread(
             target=self._batch_download_worker,
-            args=(urls, out_dir, fmt_opts),
+            args=(valid_urls, out_dir, fmt_opts),
             daemon=True,
         )
         thread.start()
