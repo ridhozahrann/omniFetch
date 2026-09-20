@@ -850,6 +850,7 @@ class YtDlpGUI:
             row_clip,
             text="Clip Duration:",
             variable=self.chk_clip_var,
+            command=self.toggle_clip_options,
             style="Custom.TCheckbutton",
         )
         chk_clip.pack(side=tk.LEFT, padx=(0, 8))
@@ -883,6 +884,8 @@ class YtDlpGUI:
         self.entry_clip_end.insert(0, "00:01:00")
         self.entry_clip_end.pack(side=tk.LEFT)
         self.themeable_inputs.append(self.entry_clip_end)
+
+        self.toggle_clip_options()
 
         self.set_mode("video")
 
@@ -1544,6 +1547,28 @@ class YtDlpGUI:
 
         threading.Thread(target=_worker, daemon=True).start()
 
+    def toggle_clip_options(self):
+        if (
+            hasattr(self, "chk_clip_var")
+            and hasattr(self, "entry_clip_start")
+            and hasattr(self, "entry_clip_end")
+        ):
+            if self.chk_clip_var.get():
+                self.entry_clip_start.config(state=tk.NORMAL)
+                self.entry_clip_end.config(state=tk.NORMAL)
+                if self.entry_clip_end.get().strip() in ("", "00:00:00", "0"):
+                    self.entry_clip_end.delete(0, tk.END)
+                    self.entry_clip_end.insert(0, "00:01:00")
+            else:
+                self.entry_clip_start.config(state=tk.NORMAL)
+                self.entry_clip_end.config(state=tk.NORMAL)
+                self.entry_clip_start.delete(0, tk.END)
+                self.entry_clip_start.insert(0, "00:00:00")
+                self.entry_clip_end.delete(0, tk.END)
+                self.entry_clip_end.insert(0, "00:00:00")
+                self.entry_clip_start.config(state=tk.DISABLED)
+                self.entry_clip_end.config(state=tk.DISABLED)
+
     def build_format_opts(self):
         mode = self.mode_var.get()
         opts = {}
@@ -1618,12 +1643,19 @@ class YtDlpGUI:
         if hasattr(self, "chk_clip_var") and self.chk_clip_var.get():
             start_sec = parse_time_str(self.entry_clip_start.get())
             end_sec = parse_time_str(self.entry_clip_end.get())
-            if start_sec is not None or end_sec is not None:
-                s = start_sec if start_sec is not None else 0
-                e = end_sec if end_sec is not None else float("inf")
+            s = start_sec if start_sec is not None else 0
+            e = end_sec if end_sec is not None else float("inf")
+            if e > s or (s > 0 and e == float("inf")):
                 if hasattr(yt_dlp.utils, "download_range_func"):
-                    opts["download_ranges"] = yt_dlp.utils.download_range_func(None, [(s, e)])
+                    opts["download_ranges"] = yt_dlp.utils.download_range_func(
+                        None, [(s, e)]
+                    )
                 opts["force_keyframes_at_cuts"] = True
+
+                ff_args = ["-ss", str(s)]
+                if e != float("inf"):
+                    ff_args.extend(["-to", str(e)])
+                opts["postprocessor_args"] = {"ffmpeg": ff_args}
 
         if postprocessors:
             opts["postprocessors"] = postprocessors
