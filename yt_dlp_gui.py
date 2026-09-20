@@ -467,6 +467,23 @@ class YtDlpGUI:
         )
         self.btn_theme_toggle.pack(side=tk.RIGHT, padx=(6, 0))
 
+        btn_update_engine = tk.Button(
+            btn_box,
+            text="Update Engine",
+            bg=p["CARD_BORDER"],
+            fg=p["TEXT_MAIN"],
+            activebackground=p["ACCENT"],
+            activeforeground=p["ACCENT_FG"],
+            font=("Segoe UI", 8, "bold"),
+            relief="flat",
+            cursor="hand2",
+            padx=8,
+            pady=3,
+            command=self.check_engine_update,
+        )
+        btn_update_engine.pack(side=tk.RIGHT, padx=(6, 0))
+        self.themeable_buttons.append((btn_update_engine, "secondary"))
+
         if self.ffmpeg_path:
             badge_text = "FFmpeg Detected"
             badge_bg = "#275d38"
@@ -1327,6 +1344,67 @@ class YtDlpGUI:
                 self.url_text.insert("1.0", clipboard)
         except tk.TclError:
             pass
+
+    def check_engine_update(self):
+        self.log("[+] Checking for yt-dlp engine updates...")
+        self.lbl_status.config(
+            text="Checking yt-dlp engine update...", foreground=self.palette["ACCENT"]
+        )
+
+        def _worker():
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+                    headers={"User-Agent": "OmniFetchPro"},
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    latest_ver = data.get("tag_name", "").lstrip("v")
+                    current_ver = (
+                        getattr(yt_dlp.version, "__version__", "Unknown")
+                        if yt_dlp
+                        else "Unknown"
+                    )
+
+                    if latest_ver and latest_ver != current_ver:
+                        res = subprocess.run(
+                            [sys.executable, "-m", "pip", "install", "-U", "yt-dlp"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if res.returncode == 0:
+                            self.msg_queue.put(
+                                ("log", f"[✓] Updated yt-dlp engine to {latest_ver}!")
+                            )
+                            self.msg_queue.put(
+                                ("status_update", f"Engine updated to {latest_ver}")
+                            )
+                        else:
+                            self.msg_queue.put(
+                                (
+                                    "log",
+                                    f"[!] New version {latest_ver} available (Current: {current_ver}).",
+                                )
+                            )
+                            self.msg_queue.put(
+                                ("status_update", f"Update available: {latest_ver}")
+                            )
+                    else:
+                        self.msg_queue.put(
+                            (
+                                "log",
+                                f"[✓] yt-dlp engine is up to date ({current_ver}).",
+                            )
+                        )
+                        self.msg_queue.put(
+                            ("status_update", f"Engine up to date ({current_ver})")
+                        )
+            except Exception as e:
+                self.msg_queue.put(("log", f"[WARN] Update check failed: {e}"))
+                self.msg_queue.put(("status_update", "Engine update check failed"))
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     def browse_folder(self):
         folder = filedialog.askdirectory(initialdir=self.path_entry.get())
