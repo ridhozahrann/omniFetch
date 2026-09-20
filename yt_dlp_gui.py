@@ -609,7 +609,6 @@ class YtDlpGUI:
             height=3,
         )
         self.url_text.pack(fill=tk.X, pady=(0, 4))
-        self.url_text.bind("<Control-Return>", lambda e: self.start_download())
         self.themeable_inputs.append(self.url_text)
 
         # Video Info Box
