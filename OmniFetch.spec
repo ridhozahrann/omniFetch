@@ -5,7 +5,7 @@ a = Analysis(
     ['yt_dlp_gui.py'],
     pathex=['.'],
     binaries=[],
-    datas=[('app.ico', '.')],
+    datas=[('app.ico', '.'), ('app.png', '.')],
     hiddenimports=[
         'yt_dlp',
         'yt_dlp.compat._legacy',

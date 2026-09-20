@@ -35,17 +35,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller pillow pycryptodomex mutagen certifi websockets requests
 
-      - name: Ensure app.ico exists
+      - name: Ensure crisp app.ico and app.png exist
         run: |
           python -c "
           from PIL import Image, ImageDraw
           import os
-          if not os.path.exists('app.ico'):
-              img = Image.new('RGBA', (64, 64), color=(0, 0, 0, 0))
-              draw = ImageDraw.Draw(img)
-              draw.rounded_rectangle([4, 4, 60, 60], radius=12, fill='#89b4fa')
-              draw.polygon([(32, 44), (20, 26), (27, 26), (27, 14), (37, 14), (37, 26), (44, 26)], fill='#11111b')
-              img.save('app.ico', format='ICO', sizes=[(16, 16), (32, 32), (48, 48), (64, 64)])
+          size = 1024
+          img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+          draw = ImageDraw.Draw(img)
+          bg_color = (137, 180, 250, 255)
+          fg_color = (17, 17, 27, 255)
+          draw.rounded_rectangle([48, 48, size - 48, size - 48], radius=200, fill=bg_color)
+          x_center = size // 2
+          draw.rectangle([x_center - 64, 220, x_center + 64, 560], fill=fg_color)
+          draw.polygon([(x_center, 720), (220, 520), (size - 220, 520)], fill=fg_color)
+          draw.rounded_rectangle([240, 740, size - 240, 820], radius=30, fill=fg_color)
+          icon_256 = img.resize((256, 256), Image.Resampling.LANCZOS)
+          icon_256.save('app.png', format='PNG')
+          sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+          icon_256.save('app.ico', format='ICO', sizes=sizes)
           "
 
       - name: Build Executable with PyInstaller

@@ -146,9 +146,16 @@ class YtDlpGUI:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
         ico_path = os.path.join(SCRIPT_DIR, "app.ico")
+        png_path = os.path.join(SCRIPT_DIR, "app.png")
         if os.path.exists(ico_path):
             try:
                 self.root.iconbitmap(ico_path)
+            except Exception:
+                pass
+        if os.path.exists(png_path):
+            try:
+                self._icon_img = tk.PhotoImage(file=png_path)
+                self.root.iconphoto(True, self._icon_img)
             except Exception:
                 pass
 
