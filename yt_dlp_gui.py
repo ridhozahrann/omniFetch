@@ -446,8 +446,13 @@ class YtDlpGUI:
         self.tab_history = ttk.Frame(self.notebook, padding=12)
         self.notebook.add(self.tab_history, text="Download History")
 
+        # TAB 3: Activity Log
+        self.tab_log = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(self.tab_log, text="Activity Log")
+
         self.build_tab_downloader()
         self.build_tab_history()
+        self.build_tab_log()
 
     # ---------------- TAB 1: DOWNLOADER ----------------
 
@@ -657,29 +662,39 @@ class YtDlpGUI:
 
         self.mode_var = tk.StringVar(value="video")
 
-        mode_btn_frame = tk.Frame(fmt_card, bg=p["CARD_BG"])
-        mode_btn_frame.pack(fill=tk.X, pady=(0, 8))
-        self.themeable_frames.append((mode_btn_frame, True))
+        # Segmented Control Pill Bar
+        pill_container = tk.Frame(
+            fmt_card,
+            bg=p["CARD_BORDER"],
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+            padx=2,
+            pady=2,
+        )
+        pill_container.pack(anchor="w", pady=(0, 10))
+        self.themeable_frames.append((pill_container, True))
 
         self.btn_mode_video = tk.Button(
-            mode_btn_frame,
+            pill_container,
             text="Video (+ Audio)",
             font=("Segoe UI", 9, "bold"),
             relief="flat",
+            bd=0,
             cursor="hand2",
-            padx=12,
+            padx=16,
             pady=5,
             command=lambda: self.set_mode("video"),
         )
-        self.btn_mode_video.pack(side=tk.LEFT, padx=(0, 10))
+        self.btn_mode_video.pack(side=tk.LEFT)
 
         self.btn_mode_audio = tk.Button(
-            mode_btn_frame,
+            pill_container,
             text="Extract Audio Only",
             font=("Segoe UI", 9, "bold"),
             relief="flat",
+            bd=0,
             cursor="hand2",
-            padx=12,
+            padx=16,
             pady=5,
             command=lambda: self.set_mode("audio"),
         )
@@ -787,7 +802,7 @@ class YtDlpGUI:
         self.combo_audio_quality.current(0)
         self.combo_audio_quality.pack(side=tk.LEFT)
 
-        # Checkboxes (Ceklis Fitur Extra)
+        # Checkboxes (Ceklis Fitur Extra - 2x2 Grid)
         sep_opts = tk.Frame(fmt_card, bg=p["CARD_BORDER"], height=1)
         sep_opts.pack(fill=tk.X, pady=(6, 6))
         self.themeable_frames.append((sep_opts, True))
@@ -800,45 +815,45 @@ class YtDlpGUI:
         )
         row_extras_lbl.pack(anchor="w", pady=(0, 4))
 
-        row_extras = tk.Frame(fmt_card, bg=p["CARD_BG"])
-        row_extras.pack(fill=tk.X, pady=(2, 0))
-        self.themeable_frames.append((row_extras, True))
+        grid_extras = tk.Frame(fmt_card, bg=p["CARD_BG"])
+        grid_extras.pack(fill=tk.X, pady=(2, 0))
+        self.themeable_frames.append((grid_extras, True))
 
         self.chk_sub_var = tk.BooleanVar(value=False)
         chk_sub = ttk.Checkbutton(
-            row_extras,
+            grid_extras,
             text="Subtitles (ID / EN)",
             variable=self.chk_sub_var,
             style="Custom.TCheckbutton",
         )
-        chk_sub.pack(side=tk.LEFT, padx=(0, 16))
+        chk_sub.grid(row=0, column=0, sticky="w", padx=(0, 40), pady=2)
 
         self.chk_thumb_var = tk.BooleanVar(value=True)
         chk_thumb = ttk.Checkbutton(
-            row_extras,
+            grid_extras,
             text="Cover Thumbnail",
             variable=self.chk_thumb_var,
             style="Custom.TCheckbutton",
         )
-        chk_thumb.pack(side=tk.LEFT, padx=(0, 16))
+        chk_thumb.grid(row=0, column=1, sticky="w", pady=2)
 
         self.chk_meta_var = tk.BooleanVar(value=True)
         chk_meta = ttk.Checkbutton(
-            row_extras,
+            grid_extras,
             text="Metadata Tags",
             variable=self.chk_meta_var,
             style="Custom.TCheckbutton",
         )
-        chk_meta.pack(side=tk.LEFT, padx=(0, 16))
+        chk_meta.grid(row=1, column=0, sticky="w", padx=(0, 40), pady=2)
 
         self.chk_desc_var = tk.BooleanVar(value=False)
         chk_desc = ttk.Checkbutton(
-            row_extras,
+            grid_extras,
             text="Save Description",
             variable=self.chk_desc_var,
             style="Custom.TCheckbutton",
         )
-        chk_desc.pack(side=tk.LEFT)
+        chk_desc.grid(row=1, column=1, sticky="w", pady=2)
 
         # Clip Duration Row
         row_clip = tk.Frame(fmt_card, bg=p["CARD_BG"])
@@ -901,62 +916,71 @@ class YtDlpGUI:
         dest_card.pack(fill=tk.X, pady=(0, 10))
         self.themeable_frames.append((dest_card, True))
 
-        path_input_frame = tk.Frame(dest_card, bg=p["CARD_BG"])
-        path_input_frame.pack(fill=tk.X)
-        self.themeable_frames.append((path_input_frame, True))
-
         ttk.Label(
-            path_input_frame,
-            text="Save Directory:",
+            dest_card,
+            text="Save Directory / Output Folder:",
             style="Card.TLabel",
             font=("Segoe UI", 9, "bold"),
-        ).pack(side=tk.LEFT, padx=(0, 8))
+        ).pack(anchor="w", pady=(0, 6))
+
+        # Unified Input Group Frame
+        input_group_frame = tk.Frame(
+            dest_card,
+            bg=p["CARD_BORDER"],
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+        )
+        input_group_frame.pack(fill=tk.X)
+        self.themeable_frames.append((input_group_frame, True))
 
         default_dir = self.user_config.get("save_dir") or str(Path.home() / "Downloads")
         self.path_entry = tk.Entry(
-            path_input_frame,
+            input_group_frame,
             bg=p["INPUT_BG"],
             fg=p["TEXT_MAIN"],
             insertbackground=p["TEXT_MAIN"],
             font=("Segoe UI", 9),
             relief="flat",
-            highlightbackground=p["CARD_BORDER"],
-            highlightthickness=1,
+            bd=0,
         )
         self.path_entry.insert(0, default_dir)
-        self.path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=4, ipadx=8)
+        self.path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=6, ipadx=8)
         self.themeable_inputs.append(self.path_entry)
 
         btn_browse = tk.Button(
-            path_input_frame,
+            input_group_frame,
             text="Browse",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
             activeforeground=p["ACCENT_FG"],
-            font=("Segoe UI", 8),
+            font=("Segoe UI", 9, "bold"),
             relief="flat",
+            bd=0,
             cursor="hand2",
-            padx=8,
+            padx=12,
+            pady=4,
             command=self.browse_folder,
         )
-        btn_browse.pack(side=tk.RIGHT, padx=(6, 0))
+        btn_browse.pack(side=tk.LEFT)
         self.themeable_buttons.append((btn_browse, "secondary"))
 
         btn_open_folder = tk.Button(
-            path_input_frame,
+            input_group_frame,
             text="Open",
             bg=p["CARD_BORDER"],
             fg=p["TEXT_MAIN"],
             activebackground=p["ACCENT"],
             activeforeground=p["ACCENT_FG"],
-            font=("Segoe UI", 8),
+            font=("Segoe UI", 9, "bold"),
             relief="flat",
+            bd=0,
             cursor="hand2",
-            padx=8,
+            padx=12,
+            pady=4,
             command=self.open_output_folder,
         )
-        btn_open_folder.pack(side=tk.RIGHT, padx=(4, 0))
+        btn_open_folder.pack(side=tk.LEFT)
         self.themeable_buttons.append((btn_open_folder, "secondary"))
 
         # --- 5. ACTION & PROGRESS CARD ---
@@ -1027,51 +1051,6 @@ class YtDlpGUI:
 
         self.lbl_speed_eta = ttk.Label(stats_frame, text="", style="Muted.TLabel")
         self.lbl_speed_eta.pack(side=tk.RIGHT, anchor="e")
-
-        # --- 6. CONSOLE LOG ---
-        log_frame = tk.Frame(container, bg=p["BG_DARK"])
-        log_frame.pack(fill=tk.BOTH, expand=True)
-        self.themeable_frames.append((log_frame, False))
-
-        log_hdr = tk.Frame(log_frame, bg=p["BG_DARK"])
-        log_hdr.pack(fill=tk.X, pady=(0, 2))
-        self.themeable_frames.append((log_hdr, False))
-
-        ttk.Label(
-            log_hdr,
-            text="Log Activity / Terminal Output:",
-            font=("Segoe UI", 8, "bold"),
-        ).pack(side=tk.LEFT)
-
-        btn_clear_log = tk.Button(
-            log_hdr,
-            text="Clear",
-            bg=p["BG_DARK"],
-            fg=p["TEXT_MUTED"],
-            activebackground=p["BG_DARK"],
-            activeforeground=p["TEXT_MAIN"],
-            font=("Segoe UI", 8),
-            relief="flat",
-            bd=0,
-            cursor="hand2",
-            command=self.clear_log,
-        )
-        btn_clear_log.pack(side=tk.RIGHT)
-        self.themeable_buttons.append((btn_clear_log, "clear"))
-
-        self.log_text = scrolledtext.ScrolledText(
-            log_frame,
-            bg=p["INPUT_BG"],
-            fg=p["TEXT_MUTED"],
-            insertbackground=p["TEXT_MAIN"],
-            font=("Consolas", 8),
-            relief="flat",
-            highlightbackground=p["CARD_BORDER"],
-            highlightthickness=1,
-            height=4,
-        )
-        self.log_text.pack(fill=tk.BOTH, expand=True)
-        self.themeable_inputs.append(self.log_text)
 
     # ---------------- TAB 2: HISTORY ----------------
 
@@ -1318,6 +1297,75 @@ class YtDlpGUI:
             self.save_history()
             self.render_history_table()
 
+    # ---------------- TAB 3: LOG ----------------
+
+    def build_tab_log(self):
+        container = self.tab_log
+        p = self.palette
+
+        hdr = tk.Frame(
+            container,
+            bg=p["CARD_BG"],
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+            padx=14,
+            pady=10,
+        )
+        hdr.pack(fill=tk.X, pady=(0, 10))
+        self.themeable_frames.append((hdr, True))
+
+        hdr_top = tk.Frame(hdr, bg=p["CARD_BG"])
+        hdr_top.pack(fill=tk.X)
+        self.themeable_frames.append((hdr_top, True))
+
+        ttk.Label(
+            hdr_top, text="Activity & Engine Log", style="Title.TLabel"
+        ).pack(side=tk.LEFT)
+
+        btn_clear_log = tk.Button(
+            hdr_top,
+            text="Clear Log",
+            bg=p["CARD_BORDER"],
+            fg=p["TEXT_MAIN"],
+            activebackground=p["ERROR"],
+            activeforeground="#ffffff",
+            font=("Segoe UI", 9),
+            relief="flat",
+            cursor="hand2",
+            padx=10,
+            pady=3,
+            command=self.clear_log,
+        )
+        btn_clear_log.pack(side=tk.RIGHT)
+        self.themeable_buttons.append((btn_clear_log, "secondary"))
+
+        ttk.Label(
+            hdr,
+            text="Detailed output logs from yt-dlp engine and background processes.",
+            style="Subtitle.TLabel",
+        ).pack(anchor="w", pady=(2, 0))
+
+        log_frame = tk.Frame(
+            container,
+            bg=p["CARD_BG"],
+            highlightbackground=p["CARD_BORDER"],
+            highlightthickness=1,
+        )
+        log_frame.pack(fill=tk.BOTH, expand=True)
+        self.themeable_frames.append((log_frame, True))
+
+        self.log_text = scrolledtext.ScrolledText(
+            log_frame,
+            bg=p["INPUT_BG"],
+            fg=p["TEXT_MUTED"],
+            insertbackground=p["TEXT_MAIN"],
+            font=("Consolas", 9),
+            relief="flat",
+            bd=0,
+        )
+        self.log_text.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        self.themeable_inputs.append(self.log_text)
+
     # ---------------- HANDLERS & HELPERS ----------------
 
     def set_mode(self, mode):
@@ -1339,7 +1387,7 @@ class YtDlpGUI:
             )
             self.btn_mode_audio.config(
                 text="Extract Audio Only",
-                bg=p["INPUT_BG"],
+                bg=p["CARD_BG"],
                 fg=p["TEXT_MUTED"],
                 activebackground=p["CARD_BORDER"],
                 activeforeground=p["TEXT_MAIN"],
@@ -1347,7 +1395,7 @@ class YtDlpGUI:
         else:
             self.btn_mode_video.config(
                 text="Video (+ Audio)",
-                bg=p["INPUT_BG"],
+                bg=p["CARD_BG"],
                 fg=p["TEXT_MUTED"],
                 activebackground=p["CARD_BORDER"],
                 activeforeground=p["TEXT_MAIN"],
