@@ -609,6 +609,7 @@ class YtDlpGUI:
             height=3,
         )
         self.url_text.pack(fill=tk.X, pady=(0, 4))
+        self.url_text.bind("<Control-Return>", lambda e: self.start_download())
         self.themeable_inputs.append(self.url_text)
 
         # Video Info Box
@@ -912,7 +913,7 @@ class YtDlpGUI:
             font=("Segoe UI", 9, "bold"),
         ).pack(side=tk.LEFT, padx=(0, 8))
 
-        default_dir = str(Path.home() / "Downloads")
+        default_dir = self.user_config.get("save_dir") or str(Path.home() / "Downloads")
         self.path_entry = tk.Entry(
             path_input_frame,
             bg=p["INPUT_BG"],
@@ -1444,6 +1445,8 @@ class YtDlpGUI:
         if folder:
             self.path_entry.delete(0, tk.END)
             self.path_entry.insert(0, folder)
+            self.user_config["save_dir"] = folder
+            self.save_user_config()
 
     def open_output_folder(self):
         folder = self.path_entry.get().strip()
@@ -1698,6 +1701,9 @@ class YtDlpGUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to create directory:\n{e}")
                 return
+
+        self.user_config["save_dir"] = out_dir
+        self.save_user_config()
 
         self.set_ui_downloading(True)
         self.cancel_requested = False
