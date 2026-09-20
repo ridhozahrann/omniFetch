@@ -11,6 +11,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
+APP_VERSION = "1.1.0"
+
 # Standardize path so yt_dlp module in workspace can be imported cleanly
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
@@ -128,13 +130,23 @@ THEMES = {
 }
 
 
+SPEED_LIMIT_OPTIONS = [
+    ("No Limit", 0),
+    ("1 MB/s", 1_000_000),
+    ("2 MB/s", 2_000_000),
+    ("5 MB/s", 5_000_000),
+    ("10 MB/s", 10_000_000),
+    ("20 MB/s", 20_000_000),
+]
+
+
 class YtDlpGUI:
     def __init__(self, root):
         self.root = root
 
         self.root.title("OmniFetch Pro - Universal Media Downloader")
         self.root.minsize(760, 720)
-        self.center_window(860, 840)
+        self.center_window(900, 880)
 
         # Set window icon
         ico_path = os.path.join(SCRIPT_DIR, "app.ico")
@@ -165,6 +177,9 @@ class YtDlpGUI:
         self.cancel_requested = False
         self.ffmpeg_path = find_ffmpeg()
 
+        # Download queue tracking: list of {url, status, progress, title}
+        self.download_queue = []
+
         # History Storage
         self.history_data = self.load_history()
 
@@ -178,8 +193,14 @@ class YtDlpGUI:
         # Setup ttk styles
         self.setup_styles()
 
+        # Build menu bar
+        self.build_menu_bar()
+
         # Build UI with Tabs
         self.build_ui()
+
+        # Build status bar
+        self.build_status_bar()
 
         # Apply active theme colors
         self.apply_theme()
@@ -194,6 +215,11 @@ class YtDlpGUI:
         self._last_autopaste = ""
         self.root.bind("<FocusIn>", self.on_focus_in)
 
+        # Keyboard shortcuts
+        self.root.bind("<Control-Return>", lambda e: self.start_download())
+        self.root.bind("<Escape>", lambda e: self.cancel_download())
+        self.root.bind("<Control-l>", lambda e: self.clear_url())
+
     def center_window(self, width=860, height=840):
         """Center the main application window on screen."""
         self.root.update_idletasks()
@@ -202,6 +228,76 @@ class YtDlpGUI:
         x = max(0, (screen_w - width) // 2)
         y = max(0, (screen_h - height) // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
+
+    def build_menu_bar(self):
+        menubar = tk.Menu(self.root, tearoff=0)
+        self.root.config(menu=menubar)
+
+        file_menu = tk.Menu(menubar, tearoff=0)
+        file_menu.add_command(label="Open Output Folder", command=self.open_output_folder)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.root.quit)
+        menubar.add_cascade(label="File", menu=file_menu)
+
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        settings_menu.add_command(label="Toggle Theme", command=self.toggle_theme)
+        settings_menu.add_command(label="Update Engine", command=self.check_engine_update)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="About OmniFetch", command=self.show_about)
+        menubar.add_cascade(label="Help", menu=help_menu)
+
+        self._menubar = menubar
+
+    def build_status_bar(self):
+        p = self.palette
+        self.statusbar_frame = tk.Frame(self.root, bg=p["CARD_BORDER"], height=26)
+        self.statusbar_frame.pack(side=tk.BOTTOM, fill=tk.X)
+        self.statusbar_frame.pack_propagate(False)
+
+        self.lbl_statusbar = tk.Label(
+            self.statusbar_frame,
+            text="Ready",
+            bg=p["CARD_BORDER"],
+            fg=p["TEXT_MAIN"],
+            font=("Segoe UI", 8),
+            anchor="w",
+            padx=10,
+        )
+        self.lbl_statusbar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        engine_ver = getattr(yt_dlp.version, "__version__", "N/A") if yt_dlp else "N/A"
+        ffmpeg_status = "FFmpeg OK" if self.ffmpeg_path else "No FFmpeg"
+        self.lbl_statusbar_right = tk.Label(
+            self.statusbar_frame,
+            text=f"Engine: {engine_ver}  |  {ffmpeg_status}  |  v{APP_VERSION}",
+            bg=p["CARD_BORDER"],
+            fg=p["TEXT_MUTED"],
+            font=("Segoe UI", 8),
+            anchor="e",
+            padx=10,
+        )
+        self.lbl_statusbar_right.pack(side=tk.RIGHT)
+
+    def show_about(self):
+        engine_ver = getattr(yt_dlp.version, "__version__", "N/A") if yt_dlp else "N/A"
+        ffmpeg_info = self.ffmpeg_path or "Not found"
+        py_ver = sys.version.split()[0]
+        messagebox.showinfo(
+            "About OmniFetch",
+            f"OmniFetch Pro v{APP_VERSION}\n"
+            f"Universal Media Downloader\n\n"
+            f"yt-dlp Engine: {engine_ver}\n"
+            f"FFmpeg: {ffmpeg_info}\n"
+            f"Python: {py_ver}\n"
+            f"Platform: {sys.platform}",
+        )
+
+    def clear_url(self):
+        if hasattr(self, "url_text"):
+            self.url_text.delete("1.0", tk.END)
+            self.info_frame.pack_forget()
 
     def on_focus_in(self, event=None):
         if self.is_downloading or not hasattr(self, "url_text"):
@@ -432,6 +528,19 @@ class YtDlpGUI:
             self.tree_history.tag_configure("even", background=p["INPUT_BG"], foreground=p["TEXT_MAIN"])
             self.tree_history.tag_configure("odd", background=p["CARD_BG"], foreground=p["TEXT_MAIN"])
 
+        # Theme status bar
+        if hasattr(self, "statusbar_frame"):
+            self.statusbar_frame.config(bg=p["CARD_BORDER"])
+            self.lbl_statusbar.config(bg=p["CARD_BORDER"], fg=p["TEXT_MAIN"])
+            self.lbl_statusbar_right.config(bg=p["CARD_BORDER"], fg=p["TEXT_MUTED"])
+
+        # Theme download queue treeview
+        if hasattr(self, "tree_queue"):
+            self.tree_queue.tag_configure("pending", foreground=p["TEXT_MUTED"])
+            self.tree_queue.tag_configure("downloading", foreground=p["ACCENT"])
+            self.tree_queue.tag_configure("done", foreground=p["SUCCESS"])
+            self.tree_queue.tag_configure("failed", foreground=p["ERROR"])
+
         self.update_mode_buttons()
         self.render_history_table()
 
@@ -585,6 +694,23 @@ class YtDlpGUI:
         )
         btn_paste.pack(side=tk.RIGHT)
         self.themeable_buttons.append((btn_paste, "secondary"))
+
+        btn_clear_url = tk.Button(
+            url_hdr_frame,
+            text="Clear",
+            bg=p["CARD_BORDER"],
+            fg=p["TEXT_MUTED"],
+            activebackground=p["ERROR"],
+            activeforeground="#ffffff",
+            font=("Segoe UI", 8, "bold"),
+            relief="flat",
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self.clear_url,
+        )
+        btn_clear_url.pack(side=tk.RIGHT, padx=(0, 4))
+        self.themeable_buttons.append((btn_clear_url, "secondary"))
 
         btn_fetch_info = tk.Button(
             url_hdr_frame,
@@ -856,6 +982,21 @@ class YtDlpGUI:
         )
         chk_desc.grid(row=1, column=1, sticky="w", pady=2)
 
+        # Speed Limiter
+        lbl_speed_limit = ttk.Label(
+            grid_extras, text="Speed Limit:", style="Card.TLabel"
+        )
+        lbl_speed_limit.grid(row=2, column=0, sticky="w", padx=(0, 40), pady=2)
+
+        self.combo_speed_limit = ttk.Combobox(
+            grid_extras,
+            values=[label for label, _ in SPEED_LIMIT_OPTIONS],
+            state="readonly",
+            width=14,
+        )
+        self.combo_speed_limit.current(0)
+        self.combo_speed_limit.grid(row=2, column=1, sticky="w", pady=2)
+
         # Clip Duration Row
         row_clip = tk.Frame(fmt_card, bg=p["CARD_BG"])
         row_clip.pack(fill=tk.X, pady=(6, 0))
@@ -993,7 +1134,7 @@ class YtDlpGUI:
             padx=14,
             pady=12,
         )
-        progress_card.pack(fill=tk.X, pady=(0, 10))
+        progress_card.pack(fill=tk.BOTH, expand=True, pady=(0, 0))
         self.themeable_frames.append((progress_card, True))
 
         btn_action_frame = tk.Frame(progress_card, bg=p["CARD_BG"])
@@ -1052,6 +1193,37 @@ class YtDlpGUI:
 
         self.lbl_speed_eta = ttk.Label(stats_frame, text="", style="Muted.TLabel")
         self.lbl_speed_eta.pack(side=tk.RIGHT, anchor="e")
+
+        # Download Queue List
+        queue_label = ttk.Label(
+            progress_card,
+            text="Download Queue:",
+            style="Card.TLabel",
+            font=("Segoe UI", 9, "bold"),
+        )
+        queue_label.pack(anchor="w", pady=(8, 4))
+
+        queue_frame = tk.Frame(progress_card, bg=p["CARD_BG"])
+        queue_frame.pack(fill=tk.BOTH, expand=True)
+        self.themeable_frames.append((queue_frame, True))
+
+        q_columns = ("idx", "url", "status", "progress")
+        self.tree_queue = ttk.Treeview(
+            queue_frame, columns=q_columns, show="headings", selectmode="browse", height=4
+        )
+        self.tree_queue.heading("idx", text="#")
+        self.tree_queue.heading("url", text="URL")
+        self.tree_queue.heading("status", text="Status")
+        self.tree_queue.heading("progress", text="Progress")
+        self.tree_queue.column("idx", width=30, anchor="center")
+        self.tree_queue.column("url", width=400, anchor="w")
+        self.tree_queue.column("status", width=100, anchor="center")
+        self.tree_queue.column("progress", width=100, anchor="center")
+
+        q_scrollbar = ttk.Scrollbar(queue_frame, orient="vertical", command=self.tree_queue.yview)
+        self.tree_queue.configure(yscrollcommand=q_scrollbar.set)
+        self.tree_queue.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        q_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
     # ---------------- TAB 2: HISTORY ----------------
 
@@ -1418,6 +1590,49 @@ class YtDlpGUI:
             self.video_opts_frame.pack_forget()
             self.audio_opts_frame.pack(fill=tk.X)
 
+    def render_download_queue(self):
+        """Refresh the download queue treeview from self.download_queue."""
+        if not hasattr(self, "tree_queue"):
+            return
+        for row in self.tree_queue.get_children():
+            self.tree_queue.delete(row)
+        for item in self.download_queue:
+            tag = item.get("status", "pending")
+            progress_text = item.get("progress", "")
+            self.tree_queue.insert(
+                "",
+                tk.END,
+                iid=item["iid"],
+                values=(
+                    item["idx"],
+                    item["url"][:60] + ("..." if len(item["url"]) > 60 else ""),
+                    item["status"].capitalize(),
+                    progress_text,
+                ),
+                tags=(tag,),
+            )
+
+    def update_queue_item(self, iid, **kwargs):
+        """Update a single queue item and refresh its row."""
+        for item in self.download_queue:
+            if item["iid"] == iid:
+                item.update(kwargs)
+                break
+        if hasattr(self, "tree_queue") and self.tree_queue.exists(iid):
+            item = next((q for q in self.download_queue if q["iid"] == iid), None)
+            if item:
+                tag = item.get("status", "pending")
+                self.tree_queue.item(
+                    iid,
+                    values=(
+                        item["idx"],
+                        item["url"][:60] + ("..." if len(item["url"]) > 60 else ""),
+                        item["status"].capitalize(),
+                        item.get("progress", ""),
+                    ),
+                    tags=(tag,),
+                )
+
     def paste_url(self):
         try:
             clipboard = self.root.clipboard_get().strip()
@@ -1457,7 +1672,7 @@ class YtDlpGUI:
                         )
                         if res.returncode == 0:
                             self.msg_queue.put(
-                                ("log", f"[✓] Updated yt-dlp engine to {latest_ver}!")
+                                ("log", f"[OK] Updated yt-dlp engine to {latest_ver}!")
                             )
                             self.msg_queue.put(
                                 ("status_update", f"Engine updated to {latest_ver}")
@@ -1476,7 +1691,7 @@ class YtDlpGUI:
                         self.msg_queue.put(
                             (
                                 "log",
-                                f"[✓] yt-dlp engine is up to date ({current_ver}).",
+                                f"[OK] yt-dlp engine is up to date ({current_ver}).",
                             )
                         )
                         self.msg_queue.put(
@@ -1549,7 +1764,7 @@ class YtDlpGUI:
             return
 
         self.lbl_status.config(
-            text="🔍 Fetching video metadata...", foreground=self.palette["ACCENT"]
+            text="Fetching video metadata...", foreground=self.palette["ACCENT"]
         )
         self.log(f"[+] Checking metadata: {target_url}")
 
@@ -1705,6 +1920,14 @@ class YtDlpGUI:
         if postprocessors:
             opts["postprocessors"] = postprocessors
 
+        # Speed limit
+        if hasattr(self, "combo_speed_limit"):
+            speed_idx = self.combo_speed_limit.current()
+            if 0 <= speed_idx < len(SPEED_LIMIT_OPTIONS):
+                limit_val = SPEED_LIMIT_OPTIONS[speed_idx][1]
+                if limit_val > 0:
+                    opts["ratelimit"] = limit_val
+
         return opts
 
     def start_download(self):
@@ -1755,6 +1978,22 @@ class YtDlpGUI:
         )
         self.lbl_speed_eta.config(text="")
 
+        # Populate download queue
+        self.download_queue = []
+        for idx, url in enumerate(valid_urls, start=1):
+            self.download_queue.append({
+                "iid": f"q_{idx}",
+                "idx": idx,
+                "url": url,
+                "status": "pending",
+                "progress": "",
+            })
+        self.render_download_queue()
+
+        # Update status bar
+        if hasattr(self, "lbl_statusbar"):
+            self.lbl_statusbar.config(text=f"Downloading {len(valid_urls)} item(s)...")
+
         fmt_opts = self.build_format_opts()
         mode_name = "Video" if self.mode_var.get() == "video" else "Audio"
         self.log(
@@ -1797,6 +2036,13 @@ class YtDlpGUI:
                     },
                 )
             )
+            # Update queue row progress
+            if hasattr(self, "_current_queue_iid"):
+                self.msg_queue.put(("queue_update", {
+                    "iid": self._current_queue_iid,
+                    "status": "downloading",
+                    "progress": f"{percent:.0f}%",
+                }))
         elif status == "finished":
             filename = os.path.basename(d.get("filename", ""))
             self.msg_queue.put(
@@ -1812,6 +2058,8 @@ class YtDlpGUI:
             if self.cancel_requested:
                 break
 
+            iid = f"q_{idx}"
+            self.msg_queue.put(("queue_update", {"iid": iid, "status": "downloading", "progress": "0%"}))
             self.msg_queue.put(
                 (
                     "status_update",
@@ -1821,6 +2069,8 @@ class YtDlpGUI:
             self.msg_queue.put(
                 ("log", f"[ Item {idx}/{total_urls} ] Processing URL: {url}")
             )
+
+            self._current_queue_iid = iid
 
             try:
                 ydl_opts = {
@@ -1943,10 +2193,14 @@ class YtDlpGUI:
                                 ("log", f"[!] Download finished but file not found: {final_path}")
                             )
 
+                self.msg_queue.put(("queue_update", {"iid": iid, "status": "done", "progress": "100%"}))
+
             except yt_dlp.utils.DownloadCancelled:
+                self.msg_queue.put(("queue_update", {"iid": iid, "status": "failed", "progress": "Cancelled"}))
                 self.msg_queue.put(("cancelled", None))
                 return
             except Exception as e:
+                self.msg_queue.put(("queue_update", {"iid": iid, "status": "failed", "progress": "Error"}))
                 self.msg_queue.put(("error_item", f"Failed {url}: {e}"))
 
         if not self.cancel_requested:
@@ -1987,12 +2241,21 @@ class YtDlpGUI:
                     )
                     self.lbl_speed_eta.config(text=f"Speed: {speed}  |  ETA: {eta}")
 
+                elif msg_type == "queue_update":
+                    self.update_queue_item(
+                        payload["iid"],
+                        status=payload.get("status", "pending"),
+                        progress=payload.get("progress", ""),
+                    )
+
                 elif msg_type == "status_update":
                     self.lbl_status.config(text=payload, foreground=p["ACCENT"])
+                    if hasattr(self, "lbl_statusbar"):
+                        self.lbl_statusbar.config(text=payload)
                 elif msg_type == "log":
                     self.log(payload)
                 elif msg_type == "fetched_info":
-                    self.lbl_info_title.config(text=f"📌 {payload['title']}")
+                    self.lbl_info_title.config(text=f"{payload['title']}")
                     self.lbl_info_details.config(
                         text=f"Channel: {payload['uploader']}   |   Detail: {payload['duration']}"
                     )
@@ -2001,7 +2264,7 @@ class YtDlpGUI:
                         text="Video/playlist metadata fetched successfully.",
                         foreground=p["SUCCESS"],
                     )
-                    self.log(f"[✓] Info: {payload['title']}")
+                    self.log(f"[OK] Info: {payload['title']}")
 
                 elif msg_type == "fetch_error":
                     self.lbl_status.config(
@@ -2015,17 +2278,19 @@ class YtDlpGUI:
                         payload["format"],
                         payload["filepath"],
                     )
-                    self.log(f"[✓] Added to History: {payload['title']}")
+                    self.log(f"[OK] Added to History: {payload['title']}")
 
                 elif msg_type == "batch_completed":
                     self.progress_bar["value"] = 100
                     self.lbl_status.config(
-                        text="✅ All Batch Downloads Complete!",
+                        text="All Batch Downloads Complete!",
                         foreground=p["SUCCESS"],
                     )
                     self.lbl_speed_eta.config(text="")
-                    self.log(f"[✓] Completed {payload} items!")
+                    self.log(f"[OK] Completed {payload} items!")
                     self.set_ui_downloading(False)
+                    if hasattr(self, "lbl_statusbar"):
+                        self.lbl_statusbar.config(text="Ready")
                     messagebox.showinfo(
                         "Batch Download Complete",
                         f"All items have been downloaded successfully ({payload})!\nCheck the Download History tab to access files.",
@@ -2034,11 +2299,13 @@ class YtDlpGUI:
                 elif msg_type == "cancelled":
                     self.progress_bar["value"] = 0
                     self.lbl_status.config(
-                        text="⚠️ Download Cancelled", foreground=p["ERROR"]
+                        text="Download Cancelled", foreground=p["ERROR"]
                     )
                     self.lbl_speed_eta.config(text="")
                     self.log("[!] Download has been cancelled.")
                     self.set_ui_downloading(False)
+                    if hasattr(self, "lbl_statusbar"):
+                        self.lbl_statusbar.config(text="Ready")
 
                 elif msg_type == "error_item":
                     self.log(f"[ERROR Item] {payload}")
