@@ -299,7 +299,7 @@ class YtDlpGUI:
             "Custom.Horizontal.TProgressbar",
             troughcolor=p["INPUT_BG"],
             background=p["ACCENT"],
-            thickness=12,
+            thickness=14,
             borderwidth=0,
         )
 
@@ -420,6 +420,10 @@ class YtDlpGUI:
         if hasattr(self, "lbl_status") and not self.is_downloading:
             self.lbl_status.config(foreground=p["TEXT_MAIN"])
 
+        if hasattr(self, "tree_history"):
+            self.tree_history.tag_configure("even", background=p["INPUT_BG"], foreground=p["TEXT_MAIN"])
+            self.tree_history.tag_configure("odd", background=p["CARD_BG"], foreground=p["TEXT_MAIN"])
+
         self.update_mode_buttons()
         self.render_history_table()
 
@@ -460,6 +464,26 @@ class YtDlpGUI:
         btn_box.pack(fill=tk.X)
         self.themeable_frames.append((btn_box, True))
 
+        if self.ffmpeg_path:
+            badge_text = "FFmpeg Detected"
+            badge_bg = "#275d38"
+            badge_fg = "#a6e3a1"
+        else:
+            badge_text = "FFmpeg Not Found"
+            badge_bg = "#6e5218"
+            badge_fg = "#f9e2af"
+
+        lbl_ffmpeg = tk.Label(
+            btn_box,
+            text=badge_text,
+            bg=badge_bg,
+            fg=badge_fg,
+            font=("Segoe UI", 8, "bold"),
+            padx=8,
+            pady=3,
+        )
+        lbl_ffmpeg.pack(side=tk.LEFT)
+
         self.btn_theme_toggle = tk.Button(
             btn_box,
             text=p["TOGGLE_TEXT"],
@@ -490,26 +514,6 @@ class YtDlpGUI:
         )
         btn_update_engine.pack(side=tk.RIGHT, padx=(6, 0))
         self.themeable_buttons.append((btn_update_engine, "secondary"))
-
-        if self.ffmpeg_path:
-            badge_text = "FFmpeg Detected"
-            badge_bg = "#275d38"
-            badge_fg = "#a6e3a1"
-        else:
-            badge_text = "FFmpeg Not Found"
-            badge_bg = "#6e5218"
-            badge_fg = "#f9e2af"
-
-        lbl_ffmpeg = tk.Label(
-            btn_box,
-            text=badge_text,
-            bg=badge_bg,
-            fg=badge_fg,
-            font=("Segoe UI", 8, "bold"),
-            padx=8,
-            pady=3,
-        )
-        lbl_ffmpeg.pack(side=tk.RIGHT)
 
         title_label = ttk.Label(
             header_card,
@@ -1234,10 +1238,11 @@ class YtDlpGUI:
         for row in self.tree_history.get_children():
             self.tree_history.delete(row)
 
-        for item in self.history_data:
+        for idx, item in enumerate(self.history_data):
             size_val = item.get("size")
             if not size_val and item.get("filepath") and os.path.exists(item.get("filepath")):
                 size_val = format_size(os.path.getsize(item["filepath"]))
+            tag = "even" if idx % 2 == 0 else "odd"
             self.tree_history.insert(
                 "",
                 tk.END,
@@ -1248,6 +1253,7 @@ class YtDlpGUI:
                     size_val or "-",
                     item.get("filepath", ""),
                 ),
+                tags=(tag,),
             )
 
     def history_open_file(self):
